@@ -3,47 +3,58 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/gorilla/websocket"
+	rtws "real-time-dashboard/backend/websocket"
 )
 
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 	CheckOrigin: func(r *http.Request) bool {
-		// We'll handle CORS properly later, but for now, allow all origins
 		return true
 	},
 }
 
-// Handles WebSocket connections
-func wsHandler(w http.ResponseWriter, r *http.Request) {
-	// Upgrade the HTTP connection to a WebSocket connection
+func serveWs(hub *rtws.Hub, w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Println("Upgrade failed:", err)
+		log.Println(err)
 		return
 	}
-	defer conn.Close()
+	client := rtws.NewClient(hub, conn)
+	hub.Register(client)
 
-	log.Println("Client connected!")
-
-	// For now, the handler will do nothing else.
-	// In the next phase, we'll add logic to send data.
-	for {
-		// Keep the connection alive
-		// Read messages from the client to prevent the handler from exiting
-		_, _, err := conn.ReadMessage()
-		if err != nil {
-			log.Println("Read error:", err)
-			break
-		}
-	}
+	// Allow collection of memory and other resources.
+	go client.WritePump()
+	go client.ReadPump()
 }
 
 func main() {
-	// Register our WebSocket handler
-	http.HandleFunc("/ws", wsHandler)
+	// Create a new Hub instance.
+	hub := rtws.NewHub()
+	go hub.Run()
+	defer hub.Stop()
+
+	// Get Finnhub API key from environment variables.
+	// In your terminal, run `export FINNHUB_API_KEY="YOUR_API_KEY"`
+	apiKey := os.Getenv("FINNHUB_API_KEY")
+	if apiKey == "" {
+		log.Fatal("Finnhub API key not found in environment variables. Please run `export FINNHUB_API_KEY=\"YOUR_API_KEY\"` in your terminal to set it.")
+	}
+
+	// Define the stocks to track.
+	stocks := []string{"AAPL", "AMZN", "MSFT", "GOOG", "NVDA", "META", "TSLA", "NFLX",  "BINANCE:BTCUSDT"}
+
+	// Create a new Subscriber and start it.
+	subscriber := rtws.NewSubscriber(hub, apiKey, stocks)
+	subscriber.Start()
+
+	// Register our WebSocket handler.
+	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		serveWs(hub, w, r)
+	})
 
 	log.Println("Server starting on port 8080...")
 	log.Fatal(http.ListenAndServe(":8080", nil))

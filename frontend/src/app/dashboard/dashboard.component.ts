@@ -18,6 +18,7 @@ interface StockChart {
 
 @Component({
   selector: 'app-dashboard',
+
   standalone: true,
   // Import the necessary modules for a standalone component
   imports: [CommonModule, BaseChartDirective],

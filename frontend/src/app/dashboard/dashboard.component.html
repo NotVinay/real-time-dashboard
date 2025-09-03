@@ -1,1 +1,33 @@
-<p>dashboard works!</p>
+<div class="dashboard-container">
+  
+  <header class="dashboard-header">
+    <h1>Real-Time Stock Dashboard</h1>
+  </header>
+
+  @if (charts.size > 0) {
+    <div class="charts-grid">
+      @for (chart of charts.values(); track chart.symbol) {
+        <div class="chart-card">
+          <div class="card-header">
+            <h2>{{ chart.symbol }}</h2>
+            <div class="latest-price">
+              ${{ getLatestData(chart.chartData) | number:'1.2-2' }}
+            </div>
+          </div>
+          <div class="chart-wrapper">
+            <canvas baseChart
+              [data]="chart.chartData"
+              [options]="chart.chartOptions"
+              [type]="chart.chartType">
+            </canvas>
+          </div>
+        </div>
+      }
+    </div>
+  } @else {
+    <div class="loading-state">
+      <p>Awaiting data from the server...</p>
+      <p>Ensure the Go backend is running.</p>
+    </div>
+  }
+</div>
